@@ -3,7 +3,6 @@ package videoswitcher
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"strconv"
@@ -210,8 +209,10 @@ func readUntil(delimeter byte, conn *net.TCPConn, timeoutInSeconds int) ([]byte,
 
 	buffer := make([]byte, 128)
 	message := []byte{}
+	found := false
+	index := len(buffer)
 
-	for !charInBuffer(delimeter, buffer) {
+	for !found {
 		_, err := conn.Read(buffer)
 		if err != nil {
 			err = errors.New(fmt.Sprintf("Error reading response: %s", err.Error()))
@@ -219,24 +220,15 @@ func readUntil(delimeter byte, conn *net.TCPConn, timeoutInSeconds int) ([]byte,
 			return message, err
 		}
 
-		message = append(message, buffer...)
+		found, index = charInBuffer(delimeter, buffer)
+
+		message = append(message, buffer[:index]...)
 	}
 
-	return removeNil(message), nil
+	return message, nil
 }
 
-func readAll(conn *net.TCPConn, timeoutInSeconds int) ([]byte, error) {
-	conn.SetReadDeadline(time.Now().Add(time.Duration(int64(timeoutInSeconds)) * time.Second))
-
-	bytes, err := ioutil.ReadAll(conn)
-	if err != nil {
-		err = errors.New(fmt.Sprintf("Error reading response: %s", err.Error()))
-		return []byte{}, err
-	}
-
-	return removeNil(bytes), nil
-}
-
+/*
 func removeNil(b []byte) (ret []byte) {
 	for _, c := range b {
 		switch c {
@@ -248,15 +240,16 @@ func removeNil(b []byte) (ret []byte) {
 	}
 	return ret
 }
+*/
 
-func charInBuffer(toCheck byte, buffer []byte) bool {
-	for _, b := range buffer {
+func charInBuffer(toCheck byte, buffer []byte) (bool, int) {
+	for i, b := range buffer {
 		if toCheck == b {
-			return true
+			return true, i
 		}
 	}
 
-	return false
+	return false, len(buffer)
 }
 
 func logError(e string) {
